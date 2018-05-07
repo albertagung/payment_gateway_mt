@@ -69,17 +69,21 @@ $(document).ready(() => {
 				let shippingCost = 0
 				// Iterate through user transaction histories
 				dataUser.transactionHistories.forEach((dataTransactions) => {
-					console.log(dataTransactions)
-					// Assign shipping cost
-					shippingCost = parseInt(dataTransactions.shippingCost)
-					// iterate through transactions products
-					dataTransactions.products.forEach((dataProductsTransaction) => {
-						// Push product id
-						arrProductsId.push({
-							productId: dataProductsTransaction.productId,
-							buyingQty: dataProductsTransaction.buyingQty
+					// Define transaction id from client
+					let transactionIdFromClient = getQueryValue().transactionId
+					// Check if transaction id is the same with the one in DB
+					if (transactionIdFromClient === dataTransactions._id) {
+						// Assign shipping cost
+						shippingCost = parseInt(dataTransactions.shippingCost)
+						// iterate through transactions products
+						dataTransactions.products.forEach((dataProductsTransaction) => {
+							// Push product id
+							arrProductsId.push({
+								productId: dataProductsTransaction.productId,
+								buyingQty: dataProductsTransaction.buyingQty
+							})
 						})
-					})
+					}
 				})
 				// Resolve in object to send differents data
 				resolve({
@@ -114,8 +118,6 @@ $(document).ready(() => {
 					let arrProductFromClient = objFromClient.arrProductsId
 					// Define shipping cost
 					let shippingCost = objFromClient.shippingCost
-					console.log('arrProductFromClient', arrProductFromClient)
-					console.log('shippingCost', shippingCost)
 					// Iterate through arr products from database
 					dataProducts.forEach((dataProductFromDatabase) => {
 						// Iterate through arr products id
@@ -124,7 +126,7 @@ $(document).ready(() => {
 							if (dataProductFromDatabase._id === dataProductFromClient.productId) {
 								// Push the transaction object
 								arrProductsTransaction.push({
-									productId: dataProductFromDatabase._id,
+									id: dataProductFromDatabase._id,
 									name: dataProductFromDatabase.productName,
 									price: dataProductFromDatabase.productPrice,
 									quantity: dataProductFromClient.buyingQty
@@ -163,12 +165,83 @@ $(document).ready(() => {
 		}
 	}
 
+	// Get transaction by id to find the transactionId (order id not object id)
+	// (promise)
+	getTransactionIdFromDatabase = () => {
+		// Loading overlay start
+		$.LoadingOverlay('show')
+		return new Promise ((resolve, reject) => {
+			// Define transaction id from client
+			let transactionIdFromClient = getQueryValue().transactionId
+			// Define url get transaction id by id
+			const urlGetTransactionById = `http://localhost:3000/transactions/${transactionIdFromClient}`
+			// Get the data
+			axios({
+				method: 'get',
+				url: urlGetTransactionById
+			})
+			.then((response) => {
+				// Define data transaction
+				let dataTransaction = response.data[0]
+				// Loading overlay stop
+				$.LoadingOverlay('hide')
+				// Resolve transaction id (will be used as order id)
+				resolve(dataTransaction.transactionId)
+			})
+		})
+	}
+
+	// Get value for bank transfer method (promise)
+	getValueForBankTransfer = () => {
+		return new Promise ((resolve, reject) => {
+			// Call get transaction id function
+			getTransactionIdFromDatabase().then((orderId) => {
+				// Call get products function
+				getProducts().then((objProductsFromClient) => {
+					// Define shipping cost object
+					let shippingCostObject = {
+						id: 'SHIP-FW-123',
+						price: objProductsFromClient.shippingCost,
+						name: 'shippingCost',
+						quantity: 1,
+					}
+					// Push extra data shipping cost
+					objProductsFromClient.arrProductsTransaction.push(shippingCostObject)
+					// Create object for bank payment request
+					let bankPaymentRequest = {
+						payment_type: 'bank_transfer',
+						transaction_details: {
+							gross_amount: decodeURIComponent(getQueryValue().orderTotal),
+							order_id: orderId
+						},
+						customer_details: {
+							email: decodeURIComponent(getQueryValue().email),
+							first_name: decodeURIComponent(getQueryValue().firstName),
+							last_name: decodeURIComponent(getQueryValue().lastName),
+							phone: decodeURIComponent(getQueryValue().phoneNumber)
+						},
+						item_details: objProductsFromClient.arrProductsTransaction,
+						bank_transfer: {
+							bank: 'bca', // Sesuaikan sama VA dari Midtrans
+							va_number: '123123' // Sesuaikan sama VA Number dari Midtrans
+						},
+						bca:{
+							sub_company_code: '00000'
+						}
+					}
+					// Resolve object
+					resolve(bankPaymentRequest)
+				})
+			})
+		})
+	}
+
 	// On load
 	$('#divBankDetails').hide()
 	$('#divCardDetails').hide()
 	populateQueryValue()
-	getProducts().then((objProductsFromClient) => {
-		console.log(objProductsFromClient)
+	getValueForBankTransfer().then((response) => {
+		console.log(response)
 	})
 	styling()
 
