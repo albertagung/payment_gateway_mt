@@ -65,8 +65,13 @@ $(document).ready(() => {
 				let dataUser = response.data[0]
 				// Define arrProducts
 				let arrProductsId = []
+				// Define shipping cost
+				let shippingCost = 0
 				// Iterate through user transaction histories
 				dataUser.transactionHistories.forEach((dataTransactions) => {
+					console.log(dataTransactions)
+					// Assign shipping cost
+					shippingCost = parseInt(dataTransactions.shippingCost)
 					// iterate through transactions products
 					dataTransactions.products.forEach((dataProductsTransaction) => {
 						// Push product id
@@ -76,7 +81,11 @@ $(document).ready(() => {
 						})
 					})
 				})
-				resolve(arrProductsId)
+				// Resolve in object to send differents data
+				resolve({
+					arrProductsId: arrProductsId,
+					shippingCost: shippingCost
+				})
 			})
 		})
 	}
@@ -100,7 +109,13 @@ $(document).ready(() => {
 				let arrProductsTransaction = []
 				// Call get products id function
 				getProductsId(getQueryValue().userId)
-				.then((arrProductFromClient) => {
+				.then((objFromClient) => {
+					// Define arrProductFromClient
+					let arrProductFromClient = objFromClient.arrProductsId
+					// Define shipping cost
+					let shippingCost = objFromClient.shippingCost
+					console.log('arrProductFromClient', arrProductFromClient)
+					console.log('shippingCost', shippingCost)
 					// Iterate through arr products from database
 					dataProducts.forEach((dataProductFromDatabase) => {
 						// Iterate through arr products id
@@ -119,8 +134,11 @@ $(document).ready(() => {
 					})
 					// Loading overlay stop
 					$.LoadingOverlay('hide')
-					// Resolve arr products transaction
-					resolve(arrProductsTransaction)
+					// Resolve in object form sending differents data
+					resolve({
+						arrProductsTransaction: arrProductsTransaction,
+						shippingCost: shippingCost
+					})
 				})
 			})
 		})
@@ -149,8 +167,8 @@ $(document).ready(() => {
 	$('#divBankDetails').hide()
 	$('#divCardDetails').hide()
 	populateQueryValue()
-	getProducts().then((dataProducts) => {
-		console.log(dataProducts)
+	getProducts().then((objProductsFromClient) => {
+		console.log(objProductsFromClient)
 	})
 	styling()
 
